@@ -1,6 +1,7 @@
 import {IColoredObject} from "./base.js";
 import {Vector2} from "../vector.js";
 import * as CircleUtils from "../utils/circle.js";
+import {BoundaryBox} from "../utils/boundary.js";
 
 const CircleSegmentCount = 48;
 
@@ -8,6 +9,14 @@ export class CircleObject extends IColoredObject {
     static #PolyPointsCache = CircleUtils.generateDiskMesh(CircleSegmentCount);
     static #IndexesCache = CircleUtils.generateDiskIndexed(CircleSegmentCount);
     static #PointsCache = this.#PolyPointsCache.slice(2);
+
+    #boundary = new BoundaryBox(0, 0, 0, 0);
+    get boundary() {
+        return this.#boundary.update(
+            this.x - this.radius, this.x + this.radius,
+            this.y - this.radius, this.y + this.radius
+        );
+    }
 
     /** @type {number} */
     #radius;

@@ -4,8 +4,10 @@ import {m4} from "./utils/m4.js";
 import * as WebglUtils from "./utils/webgl.js";
 import {generateMaze, shuffle, solveMaze, Symbols} from "./maze/maze.js";
 import {MazeChamber, MazeSide} from "./maze/chamber.js";
-import {MovementControl} from "./maze/movement.js";
+import {MovementControl, SpecialKeys} from "./maze/movement.js";
 import {RectObject} from "./objects/rect.js";
+import {SpatialTree} from "./utils/tree.js";
+import {BoundaryBox} from "./utils/boundary.js";
 
 function _sum(collection, fn) { return collection.reduce((p, c) => p + fn(c), 0); }
 
@@ -126,6 +128,8 @@ const GL = WebGL2RenderingContext;
 
 const pFps = document.getElementById("fps");
 const pDelta = document.getElementById("delta");
+const pTreeDelta = document.getElementById("tree");
+const pPhysics = document.getElementById("physics");
 const canvas = document.getElementById("canvas");
 
 const bRect = canvas.getBoundingClientRect();
@@ -188,9 +192,9 @@ const Config = [{
 {
     const mainConfig = Config.find(c => c.program === "main");
     Config.push({
-        program: "light_overlay",
-        vs: await fetch("./shaders/light_overlay.vert").then(f => f.text()),
-        fs: await fetch("./shaders/light_overlay.frag").then(f => f.text()),
+        program: "special_fx",
+        vs: await fetch("./shaders/special_fx.vert").then(f => f.text()),
+        fs: await fetch("./shaders/special_fx.frag").then(f => f.text()),
         attributes: mainConfig.attributes,
         buffers: mainConfig.buffers,
         uniforms: [
@@ -265,17 +269,86 @@ const Objects = []
 
 let lastTime = 0;
 
+function physics() {
+    if (!staticTree) return;
+
+    function _walk(node) {
+        if (BoundaryBox.isCollide(node.boundary, player.boundary)) {
+            if (node.leafs.length > 0) {
+                const result = [];
+                for (const leaf of node.leafs) {
+                    const res = _walk(leaf)
+                    if (res && res.length > 0) {
+                        result.push(...res);
+                    }
+                }
+
+                return result;
+            }
+
+            return node.items.filter(item => item.opacity > 0 && BoundaryBox.isCollide(item.boundary, player.boundary));
+        }
+    }
+
+    const collisions = _walk(staticTree.root) || [];
+
+    function resolveCollision(body1, body2) {
+        // Calculate the distance between the centers
+        const dx = body2.x - body1.x;
+        const dy = body2.y - body1.y;
+
+        const box2 = body2.boundary;
+
+        // Calculate the minimum distance before collision occurs
+        const minDistanceX = body1.radius + box2.width / 2;
+        const minDistanceY = body1.radius + box2.height / 2;
+
+        // Check if collision is happening
+        if (Math.abs(dx) < minDistanceX && Math.abs(dy) < minDistanceY) {
+            // Calculate the overlap
+            const overlapX = minDistanceX - Math.abs(dx);
+            const overlapY = minDistanceY - Math.abs(dy);
+
+            // Determine the side of collision and update velocity accordingly
+            if (overlapX < overlapY) {
+                if (dx > 0) {
+                    body1.impulse.x = -Math.abs(body1.impulse.x);
+                } else {
+                    body1.impulse.x = Math.abs(body1.impulse.x);
+                }
+
+                body1.position.x += overlapX * Math.sign(body1.impulse.x);
+                body1.impulse.x = 0.7;
+            } else {
+                if (dy > 0) {
+                    body1.impulse.y = -Math.abs(body1.impulse.y);
+                } else {
+                    body1.impulse.y = Math.abs(body1.impulse.y);
+                }
+
+                body1.position.y += overlapY * Math.sign(body1.impulse.y);
+                body1.impulse.y *= 0.7;
+            }
+        }
+    }
+
+    for (const collision of collisions) {
+        resolveCollision(player.object, collision);
+    }
+}
+
 function move(delta) {
     Movement.moveHandler(null, delta);
 
     const collisions = new Set();
     for (const light of Lights) {
-        if (light === player) continue;
+        if (light === player || light.ignore) continue;
 
         const distance = player.position.delta(light.object.position).length();
         const collDistance = player.object.radius + light.object.radius
         if (distance < collDistance) {
             collisions.add(light);
+            player.color = light.color;
         }
     }
 
@@ -286,7 +359,22 @@ function move(delta) {
         const oIndex = Objects.indexOf(collision.object);
         Objects.splice(oIndex, 1);
     }
+
+    if (Movement.specialKeys & SpecialKeys.Hint) {
+        Movement.specialKeys &= ~SpecialKeys.Hint;
+
+        const hint = new Light(player.x, player.y);
+        hint.object = new RectObject(player.x, player.y, 20, 20);
+        hint.object.castShadows = false;
+        hint.color = player.color;
+        hint.ignore = true;
+
+        Lights.push(hint);
+        Objects.push(hint.object);
+    }
 }
+
+let staticTree;
 
 function render(time) {
     const delta = Math.min(0.1, (time - lastTime) / 1000);
@@ -296,6 +384,9 @@ function render(time) {
     const t = performance.now();
 
     move(delta);
+    physics(delta);
+
+    pPhysics.textContent = (performance.now() - t).toFixed(2);
 
     const scale = 0.8;
     const cameraPosition = player.position.delta(worldCenter).scale(-1);
@@ -310,19 +401,49 @@ function render(time) {
         ]
     })));
 
+
+    const tTree = performance.now();
+
+    if (!staticTree) staticTree = new SpatialTree(Objects.filter(o => o instanceof RectObject), 2, 16);
+    const dynamicTree = new SpatialTree(Lights.map(l => l.object), 2, 64);
+    const lightsTree = new SpatialTree(Lights, 2, 64);
+
+    pTreeDelta.textContent = (performance.now() - tTree).toFixed(2);
+
+    const invProj = m4.inverse(projMatrix);
+    const leftTop = m4.transformPoint({x: -1, y: 1, z: 0}, invProj);
+    const rightBottom = m4.transformPoint({x: 1, y: -1, z: 0}, invProj);
+
+    const projWidth = rightBottom[0] - leftTop[0];
+    const projHeight = rightBottom[1] - leftTop[1];
+
+    const clipBoundary = new BoundaryBox(
+        leftTop[0] - projWidth * 0.3, rightBottom[0] + projWidth * 0.3,
+        leftTop[1] - projHeight * 0.3, rightBottom[1] + projHeight * 0.3
+    );
+    const lightClipBoundary = new BoundaryBox(
+        leftTop[0] - projWidth, rightBottom[0] + projWidth,
+        leftTop[1] - projHeight, rightBottom[1] + projHeight
+    );
+
+    const lights = lightsTree.getSegmentBodies(lightClipBoundary).filter(l => l.intensity > 0);
+    const staticObjects = staticTree.getSegmentBodies(clipBoundary).filter(o => o.opacity > 0);
+    const dynObjects = dynamicTree.getSegmentBodies(clipBoundary).filter(o => o.opacity > 0);
+    const objects = staticObjects.concat(dynObjects);
+
     gl.clearColor(0, 0, 0, 1);
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-    gl.bindFramebuffer(GL.FRAMEBUFFER, glConfig["light_overlay"].frameBuffers["fb_0"]);
+    gl.bindFramebuffer(GL.FRAMEBUFFER, glConfig["special_fx"].frameBuffers["fb_0"]);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT | GL.STENCIL_BUFFER_BIT);
 
-    renderLights();
-    renderBodies();
+    renderLights(objects, lights);
+    renderBodies(objects);
 
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
-    gl.useProgram(glConfig["light_overlay"].program);
-    gl.bindTexture(GL.TEXTURE_2D, glConfig["light_overlay"].textures["texture_0"]);
+    gl.useProgram(glConfig["special_fx"].program);
+    gl.bindTexture(GL.TEXTURE_2D, glConfig["special_fx"].textures["texture_0"]);
 
     renderFx();
 
@@ -333,8 +454,8 @@ function render(time) {
     requestAnimationFrame(render);
 }
 
-function renderBodies() {
-    const objData = prepareObjectsData(Objects);
+function renderBodies(objects) {
+    const objData = prepareObjectsData(objects.filter(o => o.opacity > 0));
 
     WebglUtils.loadDataFromConfig(gl, glConfig, [{
         program: "main",
@@ -354,14 +475,14 @@ function renderBodies() {
     gl.drawElements(GL.TRIANGLES, objData.indexes.length, GL.UNSIGNED_SHORT, 0);
 }
 
-function renderLights() {
+function renderLights(objects, lights) {
     gl.enable(gl.STENCIL_TEST);
     gl.blendFunc(gl.ONE, gl.ONE);
 
     const lightData = prepareLightData(
-        Objects.filter(obj => obj.castShadows && obj.opacity !== 0));
+        objects.filter(obj => obj.castShadows && obj.opacity !== 0));
 
-    for (const light of Lights) {
+    for (const light of lights) {
         renderSingleLight(light, lightData);
     }
 
@@ -435,7 +556,7 @@ function renderFx() {
 
     const maskData = prepareObjectsData([dummyObj]);
     WebglUtils.loadDataFromConfig(gl, glConfig, [{
-        program: "light_overlay",
+        program: "special_fx",
         uniforms: [{
             name: "projection",
             values: [false, m4.projection(bRect.width, bRect.height, 2)]
@@ -456,9 +577,9 @@ function renderFx() {
         ]
     }]);
 
-    gl.useProgram(glConfig["light_overlay"].program);
-    gl.bindVertexArray(glConfig["light_overlay"].vertexArrays["body"]);
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, glConfig["light_overlay"].buffers["indexed"]);
+    gl.useProgram(glConfig["special_fx"].program);
+    gl.bindVertexArray(glConfig["special_fx"].vertexArrays["body"]);
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, glConfig["special_fx"].buffers["indexed"]);
     gl.drawElements(GL.TRIANGLES, maskData.indexes.length, GL.UNSIGNED_SHORT, 0);
 }
 
@@ -474,7 +595,7 @@ const Movement = new MovementControl(player.object, canvas);
 Movement.setup();
 
 const worldCenter = new Vector2(canvas.width / 2, canvas.height / 2);
-const count = 10;
+const count = 25;
 const minLength = 2 * count;
 
 let mazeGenResult;
@@ -547,14 +668,15 @@ for (let i = 0; i < solvedPath.length; i++) {
 
     if (hints[i]) {
         const color = [
-            "#5026ea",
+            "#5e26ea",
             "#ea266b",
-            "#2688ea",
-            "#26ea81"
+            "#26a5ea",
+            "#26ea6b",
+            "#b9ea26",
         ][Math.floor(Math.random() * 4)];
 
         const light = new Light(worldPos.x, worldPos.y, color, 0.3, 300);
-        light.object.radius = 40;
+        light.object.radius = 20;
 
         Lights.push(light);
         Objects.push(light.object);

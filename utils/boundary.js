@@ -36,6 +36,16 @@ export class BoundaryBox {
     }
 
     /**
+     * @param {Vector2} point
+     * @return {boolean}
+     */
+    includes(point) {
+        const {x, y} = point;
+        return this.left <= x && x < this.right &&
+            this.top <= y && y < this.bottom;
+    }
+
+    /**
      * @param {number} left
      * @param {number} right
      * @param {number} top
@@ -91,6 +101,19 @@ export class BoundaryBox {
         return BoundaryBox.empty().updateFromPoints(points);
     }
 
+    static fromPointsArray(bodyPoints) {
+        const points = new Array(bodyPoints.length / 2);
+
+        for (let i = 0; i < bodyPoints.length; i++) {
+            points[i] = new Vector2(
+                bodyPoints[i * 2],
+                bodyPoints[i * 2 + 1]
+            )
+        }
+
+        return BoundaryBox.fromPoints(points);
+    }
+
     /**
      * @param {IRenderObject[]} items
      * @return {BoundaryBox}
@@ -120,5 +143,29 @@ export class BoundaryBox {
     static isEqual(b1, b2) {
         return b1.left === b2.left && b1.right === b2.right
             && b1.top === b2.top && b1.bottom === b2.bottom;
+    }
+
+    /**
+     * @param {BoundaryBox} outer
+     * @param {BoundaryBox} inside
+     * @return {boolean}
+     */
+    static isInside(outer, inside) {
+        return outer.left < inside.left && inside.right < outer.right
+            && outer.top < inside.top && inside.bottom < outer.bottom;
+    }
+
+    /**
+     * @param {BoundaryBox} box1
+     * @param {BoundaryBox} box2
+     * @return {boolean}
+     */
+    static isCollide(box1, box2) {
+        function isRangeIntersects(start1, end1, start2, end2) {
+            return end1 >= start2 && start1 <= end2;
+        }
+
+        return isRangeIntersects(box1.left, box1.right, box2.left, box2.right) &&
+            isRangeIntersects(box1.top, box1.bottom, box2.top, box2.bottom);
     }
 }

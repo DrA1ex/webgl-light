@@ -7,6 +7,8 @@ export class Light {
     object;
     #mask;
 
+    get boundary() {return this.object.boundary;}
+
     get mask() {
         this.#mask.position.x = this.x;
         this.#mask.position.y = this.y;

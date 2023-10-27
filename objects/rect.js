@@ -1,10 +1,20 @@
 import {IColoredObject} from "./base.js";
 import {Vector2} from "../vector.js";
+import {BoundaryBox} from "../utils/boundary.js";
 
 /**
  * @extends {IRenderObject}
  */
 export class RectObject extends IColoredObject {
+
+    #boundary = new BoundaryBox(0, 0, 0, 0);
+    get boundary() {
+        return this.#boundary.update(
+            this.x - this.width / 2, this.x + this.width / 2,
+            this.y - this.height / 2, this.y + this.height / 2
+        );
+    }
+
     /** @type {number} */
     get width() {return this.size.x; };
 

@@ -1,6 +1,7 @@
 import {Vector2} from "../vector.js";
 
 const ControlKeys = {Left: 0b1, Up: 0b10, Right: 0b100, Down: 0b1000};
+export const SpecialKeys = {Hint: 0b1}
 
 const DeadZone = 20;
 
@@ -9,6 +10,7 @@ export class MovementControl {
     node;
 
     controlKeys = 0;
+    specialKeys = 0;
     motionVector = new Vector2();
 
     /**
@@ -85,6 +87,10 @@ export class MovementControl {
                 case  "ArrowRight":
                 case "d":
                     this.controlKeys &= ~ControlKeys.Right;
+                    break;
+
+                case " ":
+                    this.specialKeys |= SpecialKeys.Hint;
                     break;
             }
 

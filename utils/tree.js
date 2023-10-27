@@ -60,6 +60,31 @@ export class SpatialTree {
         this.#fillLeaf(this.root);
     }
 
+    getSegmentBodies(boundary) {
+        function _walk(node, parent = null) {
+            if (BoundaryBox.isInside(boundary, node.segmentBoundary)) {
+                return (parent ?? node).items;
+            }
+
+            for (const leaf of node.leafs) {
+                if (_walk(leaf, node)) {
+                    return node.items;
+                }
+            }
+
+            return false;
+        }
+
+        let items;
+        if (this.root.leafs.length === 0 || !BoundaryBox.isInside(this.root.segmentBoundary, boundary)) {
+            items = this.root.items;
+        } else {
+            items = _walk(this.root) || [];
+        }
+
+        return items.filter(item => SpatialTree.#isContainedByBoundary(item, boundary));
+    }
+
     #fillLeaf(leaf) {
         if (leaf.items.length <= this.maxCount) return;
 
@@ -112,9 +137,6 @@ export class SpatialTree {
     }
 
     static #isContainedByBoundary(body, boundary) {
-        const {x, y} = body.position;
-
-        return boundary.left <= x && x < boundary.right &&
-            boundary.top <= y && y < boundary.bottom;
+        return boundary.includes(body.position);
     }
 }
