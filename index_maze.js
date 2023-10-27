@@ -8,6 +8,7 @@ import {MovementControl, SpecialKeys} from "./maze/movement.js";
 import {RectObject} from "./objects/rect.js";
 import {SpatialTree} from "./utils/tree.js";
 import {BoundaryBox} from "./utils/boundary.js";
+import {GameStats} from "./maze/stats.js";
 
 function _sum(collection, fn) { return collection.reduce((p, c) => p + fn(c), 0); }
 
@@ -358,19 +359,32 @@ function move(delta) {
 
         const oIndex = Objects.indexOf(collision.object);
         Objects.splice(oIndex, 1);
+
+        Stats.lights -= 1;
+        Stats.score += Math.pow(Stats.health, 2) / 100;
+        Stats.health = Math.min(100, Stats.health + 50);
+
+        if (collision.finish) {
+            count += 2;
+            setTimeout(regenerateMaze, 0);
+        }
     }
 
     if (Movement.specialKeys & SpecialKeys.Hint) {
         Movement.specialKeys &= ~SpecialKeys.Hint;
 
-        const hint = new Light(player.x, player.y);
-        hint.object = new RectObject(player.x, player.y, 20, 20);
-        hint.object.castShadows = false;
-        hint.color = player.color;
-        hint.ignore = true;
+        if (Stats.health >= 20) {
+            const hint = new Light(player.x, player.y);
+            hint.object = new RectObject(player.x, player.y, 20, 20);
+            hint.object.castShadows = false;
+            hint.color = player.color;
+            hint.ignore = true;
 
-        Lights.push(hint);
-        Objects.push(hint.object);
+            Lights.push(hint);
+            Objects.push(hint.object);
+
+            Stats.health = Math.max(0, Stats.health - 20);
+        }
     }
 }
 
@@ -385,6 +399,10 @@ function render(time) {
 
     move(delta);
     physics(delta);
+
+    Stats.health = Math.max(0, Stats.health - delta * 100 / 60);
+    player.intensity = 0.6 * Stats.health / 100;
+    player.object.radius = 10 + 20 * Stats.health / 100;
 
     pPhysics.textContent = (performance.now() - t).toFixed(2);
 
@@ -588,138 +606,115 @@ requestAnimationFrame(render);
 
 const player = new Light(0, 0, "#ff5100", 0.4, 600);
 player.object.radius = 30;
-Lights.push(player);
-Objects.push(player.object);
 
 const Movement = new MovementControl(player.object, canvas);
 Movement.setup();
 
+const Stats = new GameStats();
+
 const worldCenter = new Vector2(canvas.width / 2, canvas.height / 2);
-const count = 25;
-const minLength = 2 * count;
+let count = 5;
 
-let mazeGenResult;
-let solvedPath;
-do {
-    mazeGenResult = generateMaze(count, count);
-    solvedPath = await solveMaze(mazeGenResult.map, mazeGenResult.start, mazeGenResult.finish);
+async function regenerateMaze() {
+    staticTree = null;
+    Lights.splice(0);
+    Objects.splice(0);
 
-} while (solvedPath?.length < minLength)
+    Lights.push(player);
+    Objects.push(player.object);
 
-const {map: maze, start: mazeStart, finish: mazeFinish} = mazeGenResult;
+    const minLength = 2 * count;
 
-const chambers = new Array(count);
-for (let blockX = 0; blockX < count; blockX++) {
-    chambers[blockX] = new Array(count);
-    for (let blockY = 0; blockY < count; blockY++) {
-        const blockValue = maze[blockX][blockY];
+    let mazeGenResult;
+    let solvedPath;
+    do {
+        mazeGenResult = generateMaze(count, count);
+        solvedPath = await solveMaze(mazeGenResult.map, mazeGenResult.start, mazeGenResult.finish);
+
+    } while (solvedPath?.length < minLength)
+
+    const {map: maze, start: mazeStart, finish: mazeFinish} = mazeGenResult;
+
+    const chambers = new Array(count);
+    for (let blockX = 0; blockX < count; blockX++) {
+        chambers[blockX] = new Array(count);
+        for (let blockY = 0; blockY < count; blockY++) {
+            const blockValue = maze[blockX][blockY];
+            const worldPos = new Vector2(
+                worldCenter.x + MazeChamber.size * (blockX - count / 2),
+                worldCenter.y + MazeChamber.size * (blockY - count / 2)
+            );
+
+            const chamber = new MazeChamber(Objects, worldPos.x, worldPos.y);
+
+            if (blockX > 0) chamber.setSide(MazeSide.left, false);
+            if (blockY > 0) chamber.setSide(MazeSide.top, false);
+
+            if (blockX === mazeStart.x && blockY === mazeStart.y) {
+                player.position.x = worldPos.x;
+                player.position.y = worldPos.y;
+            } else if (blockX === mazeFinish.x && blockY === mazeFinish.y) {
+                const light = new Light(worldPos.x, worldPos.y, "#e905fc");
+                light.object.radius = 40;
+                light.finish = true;
+
+                Lights.push(light);
+                Objects.push(light.object);
+            }
+
+            if (blockValue !== Symbols.start) {
+                if (blockX > 0 && blockValue === MazeSide.left) {
+                    chambers[blockX - 1][blockY].setDoor(MazeSide.right, false);
+                } else if (blockY > 0 && blockValue === MazeSide.top) {
+                    chambers[blockX][blockY - 1].setDoor(MazeSide.bottom, false);
+                } else {
+                    chamber.setDoor(blockValue, false);
+                }
+            }
+
+            chambers[blockX][blockY] = chamber;
+        }
+    }
+
+    const effectivePathLength = solvedPath.length - 2;
+    const hintCount = Math.floor(effectivePathLength * 0.4);
+    const hints = new Array(hintCount).fill(true)
+        .concat(new Array(effectivePathLength - hintCount).fill(false));
+
+    shuffle(hints);
+
+    // Start and finish
+    hints.unshift(false);
+    hints.push(false);
+
+    for (let i = 0; i < solvedPath.length; i++) {
+        const point = solvedPath[i];
         const worldPos = new Vector2(
-            worldCenter.x + MazeChamber.size * (blockX - count / 2),
-            worldCenter.y + MazeChamber.size * (blockY - count / 2)
+            worldCenter.x + MazeChamber.size * (point.x - count / 2),
+            worldCenter.y + MazeChamber.size * (point.y - count / 2)
         );
 
-        const chamber = new MazeChamber(Objects, worldPos.x, worldPos.y);
+        if (hints[i]) {
+            const color = [
+                "#5e26ea",
+                "#ea266b",
+                "#26a5ea",
+                "#26ea6b",
+                "#b9ea26",
+            ][Math.floor(Math.random() * 4)];
 
-        if (blockX > 0) chamber.setSide(MazeSide.left, false);
-        if (blockY > 0) chamber.setSide(MazeSide.top, false);
-
-        if (blockX === mazeStart.x && blockY === mazeStart.y) {
-            player.position.x = worldPos.x;
-            player.position.y = worldPos.y;
-        } else if (blockX === mazeFinish.x && blockY === mazeFinish.y) {
-            const light = new Light(worldPos.x, worldPos.y, "#e905fc");
-            light.object.radius = 40;
+            const light = new Light(worldPos.x, worldPos.y, color, 0.3, 300);
+            light.object.radius = 20;
 
             Lights.push(light);
             Objects.push(light.object);
         }
-
-        if (blockValue !== Symbols.start) {
-            if (blockX > 0 && blockValue === MazeSide.left) {
-                chambers[blockX - 1][blockY].setDoor(MazeSide.right, false);
-            } else if (blockY > 0 && blockValue === MazeSide.top) {
-                chambers[blockX][blockY - 1].setDoor(MazeSide.bottom, false);
-            } else {
-                chamber.setDoor(blockValue, false);
-            }
-        }
-
-        chambers[blockX][blockY] = chamber;
     }
+
+    Stats.health = 100;
+    Stats.count = count;
+    Stats.lights = hintCount + 1;
 }
 
-const effectivePathLength = solvedPath.length - 2;
-const hintCount = Math.floor(effectivePathLength * 0.4);
-const hints = new Array(hintCount).fill(true)
-    .concat(new Array(effectivePathLength - hintCount).fill(false));
 
-shuffle(hints);
-
-// Start and finish
-hints.unshift(false);
-hints.push(false);
-
-for (let i = 0; i < solvedPath.length; i++) {
-    const point = solvedPath[i];
-    const worldPos = new Vector2(
-        worldCenter.x + MazeChamber.size * (point.x - count / 2),
-        worldCenter.y + MazeChamber.size * (point.y - count / 2)
-    );
-
-    if (hints[i]) {
-        const color = [
-            "#5e26ea",
-            "#ea266b",
-            "#26a5ea",
-            "#26ea6b",
-            "#b9ea26",
-        ][Math.floor(Math.random() * 4)];
-
-        const light = new Light(worldPos.x, worldPos.y, color, 0.3, 300);
-        light.object.radius = 20;
-
-        Lights.push(light);
-        Objects.push(light.object);
-    }
-}
-
-//
-// Lights.splice(0);
-// Objects.splice(0);
-//
-// const defaultIntensity = 0.6;
-// Lights.push(...[
-//     new Light(400, 300, ColorUtils.rgbToHex(1, 0, 0), defaultIntensity),
-//     new Light(600, 300, ColorUtils.rgbToHex(0, 1, 0), defaultIntensity),
-//     new Light(500, 500, ColorUtils.rgbToHex(0, 0, 1), defaultIntensity),
-//     // new Light(400, 800, ColorUtils.rgbToHex(0, 1, 1), defaultIntensity),
-//     // new Light(200, 100, ColorUtils.rgbToHex(1, 0, 1), defaultIntensity),
-//     // new Light(800, 600, ColorUtils.rgbToHex(1, 1, 0), defaultIntensity),
-// ]);
-//
-// Objects.push(...[
-//     new RectObject(100, 100, 50, 50),
-//     new RectObject(400, 100, 50, 50),
-//     new RectObject(600, 500, 50, 50),
-//     new RectObject(200, 500, 50, 50),
-//
-//     // new RectObject(380, 400, 10, 20),
-//     // new RectObject(400, 400, 10, 20),
-//     // new RectObject(420, 400, 10, 20),
-//     // new RectObject(440, 400, 10, 20),
-//     // new RectObject(460, 400, 10, 20),
-//     // new RectObject(480, 400, 10, 20),
-//     //
-//     // new RectObject(510, 550, 20, 100),
-//     // new RectObject(570, 590, 100, 20),
-//     // new RectObject(630, 550, 20, 100),
-//
-//     // new CircleObject(200, 250, 25),
-//     // new CircleObject(600, 200, 25),
-// ])
-//
-// for (const obj of Objects) {
-//     obj.color = "#232323"
-// }
-//
-// Objects.push(...Lights.map(l => l.object));
+await regenerateMaze();
