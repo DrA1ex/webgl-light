@@ -3,7 +3,8 @@ import {Vector2} from "../vector.js";
 const ControlKeys = {Left: 0b1, Up: 0b10, Right: 0b100, Down: 0b1000};
 export const SpecialKeys = {Hint: 0b1}
 
-const DeadZone = 20;
+const DeadZone = 5;
+let TouchZone = 0;
 
 export class MovementControl {
     player;
@@ -24,7 +25,8 @@ export class MovementControl {
     }
 
     moveHandler(_, delta) {
-        const motionScalar = this.motionVector.normalize().lengthSquared();
+        const length = Math.min(1, this.motionVector.length());
+        const motionScalar = this.motionVector.normalized().scale(length).lengthSquared();
         if (motionScalar) {
             const motionImpulse = this.motionVector
                 .scaled(motionScalar * 1000 * delta);
@@ -32,7 +34,7 @@ export class MovementControl {
             this.player.impulse.add(motionImpulse);
         }
 
-        this.player.impulse.scale(0.96);
+        this.player.impulse.scale(0.95);
         this.player.position.add(this.player.impulse.scaled(delta));
     }
 
@@ -101,7 +103,10 @@ export class MovementControl {
         this.node.ontouchstart = (e) => {
             e.preventDefault();
 
-            initPos = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            const rect = this.node.getBoundingClientRect();
+            initPos = {x: rect.x + rect.width / 2, y: rect.y + rect.height / 2};
+
+            TouchZone = Math.min(rect.width, rect.height) / 5;
         }
         this.node.ontouchend = (e) => {
             e.preventDefault();
@@ -125,6 +130,9 @@ export class MovementControl {
             }
 
             this.#updateCameraMotionVector();
+
+            this.motionVector.x = Math.sign(this.motionVector.x) * Math.min(1, Math.abs(movementX / TouchZone));
+            this.motionVector.y = Math.sign(this.motionVector.y) * Math.min(1, Math.abs(movementY / TouchZone));
         }
     }
 

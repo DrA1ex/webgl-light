@@ -71,7 +71,7 @@ export class MazeChamber {
         ]
 
         for (const body of [...this.walls.flat(), ...this.doors]) {
-            body.color = "#252525";
+            body.color = "#151515";
             objects.push(body);
         }
     }

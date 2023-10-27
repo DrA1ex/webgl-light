@@ -132,7 +132,7 @@ const pTreeDelta = document.getElementById("tree");
 const pPhysics = document.getElementById("physics");
 const canvas = document.getElementById("canvas");
 
-const bRect = canvas.getBoundingClientRect();
+const bRect = canvas.getClientRects()[0];
 canvas.width = bRect.width * devicePixelRatio;
 canvas.height = bRect.height * devicePixelRatio;
 
