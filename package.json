@@ -1,0 +1,10 @@
+{
+  "name": "webgl-light",
+  "author": "DrA1ex",
+  "scripts": {
+    "build": "rm -rf ./dist/ && esbuild index.js --bundle --format=esm --outdir=./dist --minify && cp ./index.html ./dist/"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.3"
+  }
+}

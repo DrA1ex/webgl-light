@@ -1,10 +1,12 @@
+import * as Shader from "./shader.js";
+
 const GL = WebGL2RenderingContext;
 
 export async function createShaderConfig(width, height) {
     const mainConfig = {
         program: "main",
-        vs: await fetch("./render/shaders/body.vert").then(f => f.text()),
-        fs: await fetch("./render/shaders/body.frag").then(f => f.text()),
+        vs: Shader.BodyVert.trim(),
+        fs: Shader.BodyFrag.trim(),
         attributes: [
             {name: "point"},
             {name: "position"},
@@ -34,8 +36,8 @@ export async function createShaderConfig(width, height) {
 
     const lightMaskConfig = {
         program: "light",
-        vs: await fetch("./render/shaders/light.vert").then(f => f.text()),
-        fs: await fetch("./render/shaders/light.frag").then(f => f.text()),
+        vs: Shader.LightVert.trim(),
+        fs: Shader.LightFrag.trim(),
         attributes: [
             {name: "point"},
         ],
@@ -59,8 +61,8 @@ export async function createShaderConfig(width, height) {
 
     const fxConfig = {
         program: "special_fx",
-        vs: await fetch("./render/shaders/special_fx.vert").then(f => f.text()),
-        fs: await fetch("./render/shaders/special_fx.frag").then(f => f.text()),
+        vs: Shader.SpecialFxVert.trim(),
+        fs: Shader.SpecialFxFrag.trim(),
         attributes: mainConfig.attributes,
         buffers: mainConfig.buffers,
         uniforms: [
