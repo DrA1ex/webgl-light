@@ -5,6 +5,7 @@ PoC of webgl 2d-lightning using pure WebGL 2
 
 
 ### Links
-- Original resolution: [link](https://dra1ex.github.io/webgl-light)
+- Original resolution (with DPR): [link](https://dra1ex.github.io/webgl-light)
+- Original resolution (without DPR): [link](https://dra1ex.github.io/webgl-light?render_scale=1)
 - 1/2 Resolution: [link](https://dra1ex.github.io/webgl-light?render_scale=0.5)
 - 1/4 Resolution: [link](https://dra1ex.github.io/webgl-light?render_scale=0.25)
