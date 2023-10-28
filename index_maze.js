@@ -406,7 +406,7 @@ function render(time) {
 
     pPhysics.textContent = (performance.now() - t).toFixed(2);
 
-    const scale = 0.8;
+    const scale = 1.6 / devicePixelRatio;
     const cameraPosition = player.position.delta(worldCenter).scale(-1);
 
     let projMatrix = m4.projection(canvas.width, canvas.height, 2);
