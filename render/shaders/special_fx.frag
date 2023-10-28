@@ -34,14 +34,12 @@ vec3 glow() {
     vec2 tex_offset = 1.0 / o_resolution;
     vec3 result = get_bright_color(u_texture, text_coord) * glow_weights[0];
 
-    for (int i = 1; i < glow_kerner_size; ++i)
-    {
+    for (int i = 1; i < glow_kerner_size; ++i) {
         result += get_bright_color(u_texture, text_coord + vec2(tex_offset.x * float(i), 0.0)) * glow_weights[i];
         result += get_bright_color(u_texture, text_coord - vec2(tex_offset.x * float(i), 0.0)) * glow_weights[i];
     }
 
-    for (int i = 1; i < glow_kerner_size; ++i)
-    {
+    for (int i = 1; i < glow_kerner_size; ++i) {
         result += get_bright_color(u_texture, text_coord + vec2(0.0, tex_offset.y * float(i))) * glow_weights[i];
         result += get_bright_color(u_texture, text_coord - vec2(0.0, tex_offset.y * float(i))) * glow_weights[i];
     }
@@ -51,7 +49,7 @@ vec3 glow() {
 
 
 vec3 get_bright_color(sampler2D tex, vec2 coord) {
-    return bright_color(texture(tex, text_coord).rgb);
+    return bright_color(texture(tex, coord).rgb);
 }
 
 vec3 bright_color(vec3 color) {
