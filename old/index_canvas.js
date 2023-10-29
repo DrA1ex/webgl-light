@@ -1,12 +1,17 @@
-import {Vector2} from "./vector.js";
+import {Vector2} from "../vector.js";
 
 const pFps = document.getElementById("fps");
 const pDelta = document.getElementById("delta");
+const pResolution = document.getElementById("resolution");
 const canvas = document.getElementById("canvas");
+
+document.getElementById("stats").style.visibility = "visible";
 
 const bRect = canvas.getBoundingClientRect();
 canvas.width = bRect.width * devicePixelRatio;
 canvas.height = bRect.height * devicePixelRatio;
+
+pResolution.textContent = `${canvas.width} x ${canvas.height}`;
 
 const shadowScale = 1;
 const auxCanvas = new OffscreenCanvas(canvas.width * shadowScale, canvas.height * shadowScale);
@@ -32,16 +37,19 @@ const objs = [
     {x: 620, y: 500, w: 20, h: 100},
 ]
 
+const speed = 15;
+const lightSize = 10;
+const lightPenetration = 0.5;
 const lightRadius = 400;
-const defaultIntensity = 0.8;
+const lightIntensity = 0.8;
 
 const lights = [
-    {x: 420, y: 250, color: "red", intensity: defaultIntensity},
-    {x: 800, y: 200, color: "green", intensity: defaultIntensity},
-    {x: 100, y: 600, color: "blue", intensity: defaultIntensity},
-    {x: 400, y: 800, color: "cyan", intensity: defaultIntensity},
-    {x: 200, y: 100, color: "magenta", intensity: defaultIntensity},
-    {x: 800, y: 600, color: "yellow", intensity: defaultIntensity},
+    {x: 420, y: 250, color: "cyan", intensity: lightIntensity},
+    {x: 800, y: 200, color: "magenta", intensity: lightIntensity},
+    {x: 100, y: 600, color: "yellow", intensity: lightIntensity},
+    // {x: 400, y: 800, color: "red", intensity: lightIntensity},
+    // {x: 200, y: 100, color: "green", intensity: lightIntensity},
+    // {x: 800, y: 600, color: "blue", intensity: lightIntensity},
 ]
 
 ctx.scale(devicePixelRatio, devicePixelRatio);
@@ -57,7 +65,7 @@ function renderBodies() {
     for (const {x, y, color} of lights) {
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.arc(x, y, lightSize, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -66,13 +74,12 @@ function renderLights() {
     for (const {x, y, color, intensity} of lights) {
         const origin = new Vector2(x, y);
 
-        aCtx.globalCompositeOperation = "source-over";
         aCtx.globalAlpha = intensity;
         aCtx.clearRect(0, 0, canvas.width, canvas.height);
 
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, lightRadius);
         gradient.addColorStop(0, color);
-        gradient.addColorStop(1, "transparent");
+        gradient.addColorStop(1, "black");
 
         aCtx.fillStyle = gradient;
 
@@ -80,15 +87,16 @@ function renderLights() {
         aCtx.arc(x, y, lightRadius, 0, Math.PI * 2);
         aCtx.fill()
 
-        // TODO: Wrong silhouette with group of bodies
-        // aCtx.strokeStyle = gradient;
-        // aCtx.lineWidth = 4;
-        // for (const obj of objs) {
-        //     aCtx.strokeRect(obj.x, obj.y, obj.w, obj.h);
-        // }
+        aCtx.strokeStyle = gradient;
+        aCtx.lineWidth = 4;
+        for (const obj of objs) {
+            aCtx.fillRect(
+                obj.x - lightPenetration, obj.y - lightPenetration,
+                obj.w + lightPenetration * 2, obj.h + lightPenetration * 2
+            );
+        }
 
         aCtx.globalAlpha = 1;
-        aCtx.globalCompositeOperation = "destination-out";
         aCtx.fillStyle = "black";
         for (const obj of objs) {
             aCtx.fillRect(obj.x, obj.y, obj.w, obj.h);
@@ -98,36 +106,38 @@ function renderLights() {
                 [obj.x + obj.w, obj.y],
                 [obj.x + obj.w, obj.y + obj.h],
                 [obj.x, obj.y + obj.h],
-            ].map(([vx, vy]) => new Vector2(vx, vy));
-
-            const eVertices = vertices.map(
-                vert => vert.delta(origin).normalize().scale(lightRadius * 1.1).add(origin)
+            ].map(
+                ([vx, vy]) => new Vector2(vx, vy)
             );
 
-            const segments = [];
-            for (let i = 0; i < vertices.length; i++) {
-                segments.push([
-                    vertices[i],
-                    vertices[(i + 1) % vertices.length],
-                    eVertices[(i + 1) % vertices.length],
-                    eVertices[i],
-                ])
+            // Hard shadows
+
+            fillLightMask(vertices, vertices.map(
+                vert => vert.delta(origin).normalize().scale(lightRadius * 1.1).add(origin)
+            ));
+
+            // Soft shadow
+
+            const steps = 10;
+            const step = lightSize / steps;
+
+            aCtx.globalAlpha = 0.05;
+
+            for (let i = 0; i < steps; i++) {
+                const size = i * step;
+
+                const sVertices1 = vertices.map(vert =>
+                    vert.delta(origin.delta(new Vector2(size, size))).normalize().scale(lightRadius * 1.1).add(origin),
+                )
+                fillLightMask(vertices, sVertices1);
+
+                const sVertices2 = vertices.map(vert =>
+                    vert.delta(origin.delta(new Vector2(-size, -size))).normalize().scale(lightRadius * 1.1).add(origin),
+                );
+                fillLightMask(vertices, sVertices2);
             }
 
-            for (const segment of segments) {
-                aCtx.beginPath();
-                for (let i = 0; i < segment.length; i++) {
-                    const s = segment[i];
-
-                    if (i === 0) {
-                        aCtx.moveTo(s.x, s.y);
-                    } else {
-                        aCtx.lineTo(s.x, s.y);
-                    }
-                }
-
-                aCtx.fill();
-            }
+            aCtx.globalAlpha = 1;
         }
 
         ctx.save();
@@ -136,6 +146,33 @@ function renderLights() {
         ctx.scale(1 / devicePixelRatio, 1 / devicePixelRatio);
         ctx.drawImage(auxCanvas, 0, 0, canvas.width, canvas.height);
         ctx.restore();
+    }
+}
+
+function fillLightMask(vertices, eVertices) {
+    const segments = [];
+    for (let i = 0; i < vertices.length; i++) {
+        segments.push([
+            vertices[i],
+            vertices[(i + 1) % vertices.length],
+            eVertices[(i + 1) % vertices.length],
+            eVertices[i],
+        ])
+    }
+
+    for (const segment of segments) {
+        aCtx.beginPath();
+        for (let i = 0; i < segment.length; i++) {
+            const s = segment[i];
+
+            if (i === 0) {
+                aCtx.moveTo(s.x, s.y);
+            } else {
+                aCtx.lineTo(s.x, s.y);
+            }
+        }
+
+        aCtx.fill();
     }
 }
 
@@ -160,8 +197,8 @@ function render(time) {
             lights[i]._direction = {x: dir, y: dir};
         }
 
-        lights[i].x += 15 * lights[i]._direction.x * delta;
-        lights[i].y += 15 * lights[i]._direction.y * delta;
+        lights[i].x += speed * lights[i]._direction.x * delta;
+        lights[i].y += speed * lights[i]._direction.y * delta;
 
         if (lights[i].x <= 0) lights[i]._direction.x = 1;
         else if (lights[i].x >= bRect.width) lights[i]._direction.x = -1;
@@ -170,7 +207,7 @@ function render(time) {
         else if (lights[i].y >= bRect.height) lights[i]._direction.y = -1;
     }
 
-    pDelta.textContent = Math.ceil((performance.now() - t)).toString();
+    pDelta.textContent = Math.ceil((performance.now() - t)).toFixed(2);
 
     requestAnimationFrame(render);
 }
