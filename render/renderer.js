@@ -13,10 +13,9 @@ export class Renderer {
     #config;
     #gl;
     #glConfig = {};
+    #glSupportFloatTexture;
 
     #resolutionScale;
-
-    get resolutionScale() {return this.#resolutionScale;}
 
     get width() {return this.#canvas.width;}
     get height() {return this.#canvas.height;}
@@ -82,7 +81,6 @@ export class Renderer {
         this.#gl.bindTexture(GL.TEXTURE_2D, this.#glConfig["special_fx"].textures["texture_0"]);
 
         this.#renderFx();
-
         this.#gl.bindTexture(GL.TEXTURE_2D, null);
     }
 

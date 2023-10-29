@@ -58,6 +58,21 @@ export async function createShaderConfig(width, height) {
         }],
     };
 
+    const textureConfig = {
+        width: width,
+        height: height,
+        format: GL.RGBA,
+        internalFormat: GL.RGB10_A2,
+        type: GL.UNSIGNED_INT_2_10_10_10_REV,
+        params: {
+            min: GL.NEAREST,
+            mag: GL.NEAREST,
+            wrapS: GL.CLAMP_TO_EDGE,
+            wrapT: GL.CLAMP_TO_EDGE,
+        },
+        generateMipmap: false
+    }
+
 
     const fxConfig = {
         program: "special_fx",
@@ -73,32 +88,10 @@ export async function createShaderConfig(width, height) {
         vertexArrays: mainConfig.vertexArrays,
         textures: [{
             name: "texture_0",
-            width: width,
-            height: height,
-            format: GL.RGBA,
-            internalFormat: GL.RGBA,
-            type: GL.UNSIGNED_BYTE,
-            params: {
-                min: GL.NEAREST,
-                mag: GL.NEAREST,
-                wrapS: GL.CLAMP_TO_EDGE,
-                wrapT: GL.CLAMP_TO_EDGE,
-            },
-            generateMipmap: false
+            ...textureConfig
         }, {
             name: "texture_1",
-            width: width,
-            height: height,
-            format: GL.RGBA,
-            internalFormat: GL.RGBA,
-            type: GL.UNSIGNED_BYTE,
-            params: {
-                min: GL.NEAREST,
-                mag: GL.NEAREST,
-                wrapS: GL.CLAMP_TO_EDGE,
-                wrapT: GL.CLAMP_TO_EDGE,
-            },
-            generateMipmap: false
+            ...textureConfig
         }],
         frameBuffers: [
             {name: "fb_0", texture: "texture_0", attachment: GL.COLOR_ATTACHMENT0, stencil: true},
