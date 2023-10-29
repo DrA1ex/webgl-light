@@ -129,10 +129,8 @@ export class MovementControl {
                 this.controlKeys |= movementY < 0 ? ControlKeys.Up : ControlKeys.Down;
             }
 
-            this.#updateCameraMotionVector();
-
-            this.motionVector.x = Math.sign(this.motionVector.x) * Math.min(1, Math.abs(movementX / TouchZone));
-            this.motionVector.y = Math.sign(this.motionVector.y) * Math.min(1, Math.abs(movementY / TouchZone));
+            this.motionVector.x = Math.sign(movementX) * Math.min(1, Math.abs(movementX / TouchZone));
+            this.motionVector.y = Math.sign(movementY) * Math.min(1, Math.abs(movementY / TouchZone));
         }
     }
 
@@ -152,5 +150,7 @@ export class MovementControl {
         } else {
             this.motionVector.x = 0;
         }
+
+        this.motionVector.normalize();
     }
 }
