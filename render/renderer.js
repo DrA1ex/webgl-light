@@ -18,6 +18,9 @@ export class Renderer {
 
     get resolutionScale() {return this.#resolutionScale;}
 
+    get width() {return this.#canvas.width;}
+    get height() {return this.#canvas.height;}
+
     setProjectionMatrix(matrix) {
         WebglUtils.loadDataFromConfig(this.#gl, this.#glConfig, this.#config.map(s => ({
             program: s.program,
@@ -40,7 +43,7 @@ export class Renderer {
 
         const projection = m4.projection(this.#rect.width, this.#rect.height, 2);
 
-        this.#gl.viewport(0, 0, this.#canvas.width, this.#canvas.height);
+        this.#gl.viewport(0, 0, this.width, this.height);
         this.#gl.clearColor(0, 0, 0, 1);
         this.#gl.clear(GL.COLOR_BUFFER_BIT);
 
@@ -52,7 +55,7 @@ export class Renderer {
         this.#gl.enable(GL.DEPTH_TEST);
         this.#gl.depthFunc(GL.LEQUAL);
 
-        this.#config = await ShaderConfig.createShaderConfig(this.#canvas.width, this.#canvas.height);
+        this.#config = await ShaderConfig.createShaderConfig(this.width, this.height);
         WebglUtils.createFromConfig(this.#gl, this.#config, this.#glConfig);
 
         WebglUtils.loadDataFromConfig(this.#gl, this.#glConfig, this.#config.map(s => ({
@@ -138,7 +141,7 @@ export class Renderer {
                 values: [1]
             }, {
                 name: "resolution",
-                values: [this.#canvas.width, this.#canvas.height]
+                values: [this.width, this.height]
             }],
             buffers: [
                 {name: "point", data: new Float32Array(maskData.points)},

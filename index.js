@@ -52,10 +52,13 @@ const pFps = document.getElementById("fps");
 const pDelta = document.getElementById("delta");
 const pTreeDelta = document.getElementById("tree");
 const pPhysics = document.getElementById("physics");
+const pResolution = document.getElementById("resolution");
 const canvas = document.getElementById("canvas");
 
 const Render = new Renderer(canvas, RenderScale);
 await Render.init();
+
+pResolution.textContent = `${Render.width} x ${Render.height}`;
 
 const player = new Light(0, 0, "#ff5100", PlayerLightIntensity, PlayerLightDistanceRadius);
 
