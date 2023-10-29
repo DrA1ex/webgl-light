@@ -6,6 +6,11 @@ import * as ShaderConfig from "./shaders/config.js";
 
 const GL = WebGL2RenderingContext;
 
+const SpecialFxEnum = {
+    none: 0,
+    glow: 1,
+}
+
 export class Renderer {
     #canvas;
     #rect;
@@ -136,7 +141,7 @@ export class Renderer {
                 values: [false, m4.projection(this.#rect.width, this.#rect.height, 2)]
             }, {
                 name: "effect",
-                values: [1]
+                values: [SpecialFxEnum.glow]
             }, {
                 name: "resolution",
                 values: [this.width, this.height]
