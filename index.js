@@ -43,7 +43,7 @@ const urlSearchParams = new URLSearchParams(window.location.search);
 const queryParams = Object.fromEntries(urlSearchParams.entries());
 
 if (queryParams["stats"] === "1") {
-    document.getElementById("stats").style.display = "block";
+    document.getElementById("stats").style.visibility = "visible";
 }
 
 const RenderScale = Number.parseFloat(queryParams["render_scale"] || devicePixelRatio);

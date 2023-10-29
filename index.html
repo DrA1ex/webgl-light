@@ -3,36 +3,83 @@
     <meta charset="UTF-8">
     <title>Title</title>
     <script type="module" src="./index.js"></script>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #stats {
+            visibility: hidden;
+
+            position: absolute;
+            left: 1rem;
+            bottom: 1rem;
+
+            display: grid;
+            grid-template-columns: max-content auto;
+            grid-auto-rows: auto;
+            grid-column-gap: 1rem;
+
+            color: white;
+            text-shadow: 0 0 2px black;
+            font-family: monospace;
+        }
+
+        #ui {
+            position: absolute;
+            left: 2rem;
+            top: 2rem;
+
+            display: grid;
+            grid-template-columns: max-content auto;
+            grid-auto-rows: auto;
+
+            color: #c7c7c7;
+            text-shadow: 0 0 2px black;
+            font-family: system-ui;
+            font-size: 1.5rem;
+        }
+
+        #ui div:first-child {
+            padding-right: 2rem
+        }
+    </style>
 </head>
-<body style="margin: 0">
+<body>
 
-<canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+<canvas id="canvas"></canvas>
 
-<div id="stats"
-     style=" display:none; color: white; text-shadow: 0 0 2px black; position: absolute; left: 1rem; bottom: 1rem; font-family: monospace; line-height: 0.2rem">
-    <p>fps: <span id="fps">0</span></p>
-    <p>physics: <span id="physics">0</span> ms</p>
-    <p>- tree: <span id="tree">0</span> ms</p>
-    <p>render: <span id="delta">0</span> ms</p>
+<div id="ui">
+    <div>Score:</div>
+    <div id="score">0</div>
+
+    <div>Size:</div>
+    <div id="count">0</div>
+
+    <div>Health:</div>
+    <div id="health">0</div>
+
+    <div>Lights:</div>
+    <div id="lights">0</div>
 </div>
 
-<table style="color: #c7c7c7; text-shadow: 0 0 2px black; position: absolute; left: 2rem; top: 2rem; font-family: system-ui; font-size: 1.5rem;">
-    <tr>
-        <td style="padding-right: 2rem">Score:</td>
-        <td id="score">0</td>
-    </tr>
-    <tr>
-        <td>Size:</td>
-        <td id="count">0</td>
-    </tr>
-    <tr>
-        <td>Health:</td>
-        <td id="health">0</td>
-    </tr>
-    <tr>
-        <td>Lights:</td>
-        <td id="lights">0</td>
-    </tr>
-</table>
+<div id="stats">
+    <div>fps:</div>
+    <div id="fps">0</div>
+
+    <div>physics:</div>
+    <div><span id="physics">0</span> ms</div>
+
+    <div>- tree:</div>
+    <div><span id="tree">0</span> ms</div>
+
+    <div>render:</div>
+    <div><span id="delta">0</span> ms</div>
+</div>
 </body>
 </html>
