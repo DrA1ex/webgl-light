@@ -22,7 +22,7 @@ const MazeLightColors = [
     "#b9ea26",
 ]
 
-const Zoom = 1.6;
+const Zoom = 0.8;
 
 const HintRadius = 20;
 const PlayerRadius = 30;
@@ -91,7 +91,7 @@ function render(time) {
 
     pPhysics.textContent = (performance.now() - t).toFixed(2);
 
-    const scale = Zoom / Render.resolutionScale;
+    const scale = Zoom;
     const cameraPosition = player.position.delta(WorldCenter).scale(-1);
 
     let projMatrix = m4.projection(canvas.width, canvas.height, 2);
