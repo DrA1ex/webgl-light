@@ -6,6 +6,7 @@ const pResolution = document.getElementById("resolution");
 const canvas = document.getElementById("canvas");
 
 document.getElementById("stats").style.visibility = "visible";
+document.getElementById("ui").style.visibility = "hidden";
 
 const bRect = canvas.getBoundingClientRect();
 canvas.width = bRect.width * devicePixelRatio;
@@ -13,7 +14,7 @@ canvas.height = bRect.height * devicePixelRatio;
 
 pResolution.textContent = `${canvas.width} x ${canvas.height}`;
 
-const shadowScale = 1;
+const shadowScale = 0.5;
 const auxCanvas = new OffscreenCanvas(canvas.width * shadowScale, canvas.height * shadowScale);
 
 const ctx = canvas.getContext("2d");
@@ -37,8 +38,8 @@ const objs = [
     {x: 620, y: 500, w: 20, h: 100},
 ]
 
-const speed = 15;
-const lightSize = 10;
+const speed = 5;
+const lightSize = 30;
 const lightPenetration = 0.5;
 const lightRadius = 400;
 const lightIntensity = 0.8;
@@ -99,6 +100,8 @@ function renderLights() {
         aCtx.globalAlpha = 1;
         aCtx.fillStyle = "black";
         for (const obj of objs) {
+            if (new Vector2(obj.x, obj.y).delta(origin).length() > lightRadius) continue;
+
             aCtx.fillRect(obj.x, obj.y, obj.w, obj.h);
 
             const vertices = [
@@ -112,28 +115,35 @@ function renderLights() {
 
             // Hard shadows
 
-            fillLightMask(vertices, vertices.map(
-                vert => vert.delta(origin).normalize().scale(lightRadius * 1.1).add(origin)
-            ));
+            // fillLightMask(vertices, vertices.map(
+            //     vert => vert.delta(origin).normalize().scale(lightRadius * 1.1).add(origin)
+            // ));
 
             // Soft shadow
 
             const steps = 10;
             const step = lightSize / steps;
 
-            aCtx.globalAlpha = 0.05;
+            aCtx.globalAlpha = 0.07;
 
             for (let i = 0; i < steps; i++) {
                 const size = i * step;
 
-                const sVertices1 = vertices.map(vert =>
-                    vert.delta(origin.delta(new Vector2(size, size))).normalize().scale(lightRadius * 1.1).add(origin),
-                )
+                const sVertices1 = vertices.map(vert => {
+                    const angle = vert.delta(origin).normalize();
+                    const lightPos = angle.rotated(Math.PI / 2).scale(size).add(origin);
+
+                    return vert.delta(lightPos).normalize().scale(lightRadius * 1.2).add(origin);
+                });
+
                 fillLightMask(vertices, sVertices1);
 
-                const sVertices2 = vertices.map(vert =>
-                    vert.delta(origin.delta(new Vector2(-size, -size))).normalize().scale(lightRadius * 1.1).add(origin),
-                );
+                const sVertices2 = vertices.map(vert => {
+                    const angle = vert.delta(origin).normalize();
+                    const lightPos = angle.rotated(-Math.PI / 2).scale(size).add(origin);
+
+                    return vert.delta(lightPos).normalize().scale(lightRadius * 1.2).add(origin);
+                });
                 fillLightMask(vertices, sVertices2);
             }
 
