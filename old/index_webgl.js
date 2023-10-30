@@ -1,11 +1,12 @@
-import {m4} from "./utils/m4.js";
+import {m4} from "../utils/m4.js";
 
-import {RectObject} from "./objects/rect.js";
-import {Light} from "./objects/light.js";
+import {RectObject} from "../objects/rect.js";
+import {Light} from "../objects/light.js";
 
-import * as ColorUtils from "./utils/color.js";
-import * as WebglUtils from "./utils/webgl.js";
-import {CircleObject} from "./objects/circle.js";
+import * as ColorUtils from "../utils/color.js";
+import * as WebglUtils from "../utils/webgl.js";
+import {CircleObject} from "../objects/circle.js";
+import {BodyFrag, BodyVert, LightFrag, LightVert} from "../render/shaders/shader.js";
 
 function _sum(collection, fn) { return collection.reduce((p, c) => p + fn(c), 0); }
 
@@ -127,8 +128,8 @@ const GL = WebGL2RenderingContext;
 const Config = [
     {
         program: "main",
-        vs: await fetch("./shaders/body.vert").then(f => f.text()),
-        fs: await fetch("./shaders/body.frag").then(f => f.text()),
+        vs: BodyVert.trim(),
+        fs: BodyFrag.trim(),
         attributes: [
             {name: "point"},
             {name: "position"},
@@ -157,8 +158,8 @@ const Config = [
     },
     {
         program: "light",
-        vs: await fetch("./shaders/light.vert").then(f => f.text()),
-        fs: await fetch("./shaders/light.frag").then(f => f.text()),
+        vs: LightVert.trim(),
+        fs: LightFrag.trim(),
         attributes: [
             {name: "point"},
         ],
@@ -182,11 +183,16 @@ const Config = [
 
 const pFps = document.getElementById("fps");
 const pDelta = document.getElementById("delta");
+const pResolution = document.getElementById("resolution");
 const canvas = document.getElementById("canvas");
+
+document.getElementById("stats").style.visibility = "visible";
 
 const bRect = canvas.getBoundingClientRect();
 canvas.width = bRect.width * devicePixelRatio;
 canvas.height = bRect.height * devicePixelRatio;
+
+pResolution.textContent = `${canvas.width} x ${canvas.height}`;
 
 const projection = m4.projection(bRect.width, bRect.height, 2);
 const gl = canvas.getContext("webgl2", {premultipliedAlpha: true, stencil: true});
@@ -213,15 +219,16 @@ WebglUtils.loadDataFromConfig(gl, glConfig, Config.map(s => ({
     ]
 })));
 
+const speed = 15;
 const defaultIntensity = 0.6;
 
 const lights = [
-    new Light(400, 300, ColorUtils.rgbToHex(1, 0, 0), defaultIntensity, 800),
-    new Light(800, 200, ColorUtils.rgbToHex(0, 1, 0), defaultIntensity),
-    new Light(100, 600, ColorUtils.rgbToHex(0, 0, 1), defaultIntensity),
-    new Light(400, 800, ColorUtils.rgbToHex(0, 1, 1), defaultIntensity),
-    new Light(200, 100, ColorUtils.rgbToHex(1, 0, 1), defaultIntensity),
-    new Light(800, 600, ColorUtils.rgbToHex(1, 1, 0), defaultIntensity),
+    new Light(400, 300, ColorUtils.rgbToHex(0, 1, 1), defaultIntensity),
+    new Light(800, 200, ColorUtils.rgbToHex(1, 0, 1), defaultIntensity),
+    new Light(100, 600, ColorUtils.rgbToHex(1, 1, 0), defaultIntensity),
+    // new Light(400, 800, ColorUtils.rgbToHex(1, 0, 0), defaultIntensity),
+    // new Light(200, 100, ColorUtils.rgbToHex(0, 1, 0), defaultIntensity),
+    // new Light(800, 600, ColorUtils.rgbToHex(0, 0, 1), defaultIntensity),
 ]
 
 const objs = [
@@ -271,8 +278,8 @@ function render(time) {
             lights[i]._direction = {x: dir, y: dir};
         }
 
-        lights[i].position.x += 30 * lights[i]._direction.x * delta;
-        lights[i].position.y += 30 * lights[i]._direction.y * delta;
+        lights[i].position.x += speed * lights[i]._direction.x * delta;
+        lights[i].position.y += speed * lights[i]._direction.y * delta;
 
         if (lights[i].x <= 0) lights[i]._direction.x = 1;
         else if (lights[i].x >= bRect.width) lights[i]._direction.x = -1;
@@ -348,6 +355,7 @@ function renderLightBackground(light) {
 
 function renderLights() {
     gl.enable(gl.STENCIL_TEST);
+    gl.blendFunc(gl.ONE, gl.ONE);
 
     const lightData = prepareLightData(objs.filter(obj => obj.castShadows));
 
@@ -356,6 +364,7 @@ function renderLights() {
     }
 
     gl.disable(gl.STENCIL_TEST);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 function renderBodies() {
